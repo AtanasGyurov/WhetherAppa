@@ -14,7 +14,8 @@ NORMALS = {
 }
 
 st.title("🌦️ Време и Морски Условия (за рибари)")
-city = st.text_input("Въведи град:", "Plovdiv")
+cities = ["Plovdiv", "Burgas", "Varna", "Sofia"]
+city = st.selectbox("Избери град:", cities, index=0)
 
 # --- Геолокация ---
 geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
@@ -114,18 +115,26 @@ headers = {'Authorization': STORMGLASS_API_KEY}
 marine_resp = requests.get(storm_url, headers=headers)
 
 if marine_resp.status_code == 200:
-    marine_data = marine_resp.json()["hours"][0]
-    wave_height = marine_data["waveHeight"]["noaa"]
-    water_temp = marine_data["waterTemperature"]["noaa"]
-    wind_speed = marine_data["windSpeed"]["noaa"]
+    hourly_data = marine_resp.json().get("hours", [])
+    if hourly_data:
+        first_valid = next((h for h in hourly_data if all(
+            key in h and h[key].get("noaa") is not None for key in ["waveHeight", "waterTemperature", "windSpeed"])), None)
+        if first_valid:
+            wave_height = first_valid["waveHeight"]["noaa"]
+            water_temp = first_valid["waterTemperature"]["noaa"]
+            wind_speed = first_valid["windSpeed"]["noaa"]
 
-    st.metric("🌊 Височина на вълните", f"{wave_height:.1f} m")
-    st.metric("🌡️ Температура на водата", f"{water_temp:.1f} °C")
-    st.metric("💨 Скорост на вятъра", f"{wind_speed:.1f} m/s")
+            st.metric("🌊 Височина на вълните", f"{wave_height:.1f} m")
+            st.metric("🌡️ Температура на водата", f"{water_temp:.1f} °C")
+            st.metric("💨 Скорост на вятъра", f"{wind_speed:.1f} m/s")
 
-    if wave_height > 1.5:
-        st.warning("⚠️ Вълните са високи – не се препоръчва излизане за риболов.")
+            if wave_height > 1.5:
+                st.warning("⚠️ Вълните са високи – не се препоръчва излизане за риболов.")
+            else:
+                st.success("✅ Морските условия са добри за риболов.")
+        else:
+            st.warning("⚠️ Липсват валидни данни за морските условия.")
     else:
-        st.success("✅ Морските условия са добри за риболов.")
+        st.warning("⚠️ Не са получени часове за днешния ден от StormGlass.")
 else:
     st.warning("⚠️ Неуспешно изтегляне на морски данни. Провери API ключа.")
