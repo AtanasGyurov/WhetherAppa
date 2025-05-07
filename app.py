@@ -6,7 +6,7 @@ from datetime import datetime
 from datetime import date
 
 API_KEY = "a77d7131abc8110bdf258dc669f6b257"  # OpenWeatherMap
-STORMGLASS_API_KEY = "your_stormglass_api_key"  # Replace with your actual key
+STORMGLASS_API_KEY = "7df8e3e2-2b28-11f0-b92e-0242ac130003-7df8e446-2b28-11f0-b92e-0242ac130003"  # Replace with your actual key
 
 NORMALS = {
     "April": {"temp": 14, "rain_days": 7},
