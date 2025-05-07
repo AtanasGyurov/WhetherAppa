@@ -2,9 +2,11 @@ import streamlit as st #za web prilojeniq
 import requests #za vruzka s API
 import pandas as pd #za tablici
 import matplotlib.pyplot as plt #za vizualizacii
+from datetime import datetime
 
 API_KEY = "a77d7131abc8110bdf258dc669f6b257"
-URL_FORECAST = "https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API key}"
+URL_FORECAST = f"https://api.openweathermap.org/data/2.5/forecast?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
+
 URL_AIR = "http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API key}"
 
 CITY = "Plovdiv"
