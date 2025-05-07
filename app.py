@@ -3,31 +3,32 @@ import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+from datetime import date
 
-API_KEY = "a77d7131abc8110bdf258dc669f6b257"
+API_KEY = "a77d7131abc8110bdf258dc669f6b257"  # OpenWeatherMap
+STORMGLASS_API_KEY = "your_stormglass_api_key"  # Replace with your actual key
 
 NORMALS = {
     "April": {"temp": 14, "rain_days": 7},
     "May": {"temp": 18, "rain_days": 9}
 }
 
-# --- UI ---
-st.title("🌦️ Времето в избран град + климатичен анализ")
+st.title("🌦️ Време и Морски Условия (за рибари)")
 city = st.text_input("Въведи град:", "Plovdiv")
 
-# --- Get coordinates ---
-geocode_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
-geo_resp = requests.get(geocode_url).json()
+# --- Геолокация ---
+geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
+geo_resp = requests.get(geo_url).json()
 if not geo_resp:
     st.error("❌ Неуспешно намиране на града.")
     st.stop()
-
 lat = geo_resp[0]["lat"]
 lon = geo_resp[0]["lon"]
 
-# --- Fetch forecast data ---
-URL_FORECAST = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
-response = requests.get(URL_FORECAST)
+# --- Прогноза за времето ---
+st.header("📅 Прогноза за времето и анализ")
+forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
+response = requests.get(forecast_url)
 if response.status_code != 200:
     st.error("❌ Неуспешно изтегляне на прогноза.")
     st.stop()
@@ -51,8 +52,7 @@ daily = df.groupby("date").agg(
     rain_occurred=("rain", lambda x: (x > 0).any())
 ).reset_index()
 
-# --- Visualization ---
-st.subheader("📈 Графики на температурата и валежите")
+# --- Визуализации ---
 fig, ax = plt.subplots()
 ax.plot(daily["date"], daily["avg_temp"], marker='o', color='orange')
 ax.set_title("Средна температура по дни")
@@ -67,7 +67,6 @@ st.bar_chart(daily.set_index("date")["total_rain"], use_container_width=True)
 current_month = datetime.today().strftime("%B")
 norm_temp = NORMALS.get(current_month, {}).get("temp", None)
 norm_rain_days = NORMALS.get(current_month, {}).get("rain_days", None)
-
 avg_temp = round(daily["avg_temp"].mean(), 1)
 rain_days = daily["rain_occurred"].sum()
 
@@ -89,7 +88,7 @@ if norm_rain_days:
     else:
         st.info("☀️ Броят на дъждовните дни е в рамките на нормата.")
 
-# --- Air Quality ---
+# --- Въздух ---
 st.subheader("🌫️ Качество на въздуха")
 URL_AIR = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
 air_response = requests.get(URL_AIR)
@@ -103,6 +102,30 @@ if air_response.status_code == 200:
         4: "Нездравословно",
         5: "Опасно"
     }
-    st.write(f"Индекс на качеството на въздуха (AQI): **{aqi}** - {AQI_LEVELS.get(aqi, 'Неизвестно')}")
+    st.write(f"AQI: **{aqi}** - {AQI_LEVELS.get(aqi, 'Неизвестно')}")
 else:
-    st.warning("⚠️ Неуспешно изтегляне на данни за въздуха.")
+    st.warning("⚠️ Няма информация за качеството на въздуха.")
+
+# --- Морски условия ---
+st.header("🌊 Морски условия (за рибари)")
+today = date.today().isoformat()
+storm_url = f"https://api.stormglass.io/v2/weather/point?lat={lat}&lng={lon}&params=waveHeight,waterTemperature,windSpeed&start={today}&end={today}"
+headers = {'Authorization': STORMGLASS_API_KEY}
+marine_resp = requests.get(storm_url, headers=headers)
+
+if marine_resp.status_code == 200:
+    marine_data = marine_resp.json()["hours"][0]
+    wave_height = marine_data["waveHeight"]["noaa"]
+    water_temp = marine_data["waterTemperature"]["noaa"]
+    wind_speed = marine_data["windSpeed"]["noaa"]
+
+    st.metric("🌊 Височина на вълните", f"{wave_height:.1f} m")
+    st.metric("🌡️ Температура на водата", f"{water_temp:.1f} °C")
+    st.metric("💨 Скорост на вятъра", f"{wind_speed:.1f} m/s")
+
+    if wave_height > 1.5:
+        st.warning("⚠️ Вълните са високи – не се препоръчва излизане за риболов.")
+    else:
+        st.success("✅ Морските условия са добри за риболов.")
+else:
+    st.warning("⚠️ Неуспешно изтегляне на морски данни. Провери API ключа.")
