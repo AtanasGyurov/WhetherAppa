@@ -2,11 +2,11 @@ import streamlit as st
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
-from datetime import date
+from datetime import datetime, date
 
+# 🔑 API ключове
 API_KEY = "a77d7131abc8110bdf258dc669f6b257"  # OpenWeatherMap
-STORMGLASS_API_KEY = "7df8e3e2-2b28-11f0-b92e-0242ac130003-7df8e446-2b28-11f0-b92e-0242ac130003"  # Replace with your actual key
+STORMGLASS_API_KEY = "7df8e3e2-2b28-11f0-b92e-0242ac130003-7df8e446-2b28-11f0-b92e-0242ac130003"
 
 NORMALS = {
     "April": {"temp": 14, "rain_days": 7},
@@ -14,8 +14,7 @@ NORMALS = {
 }
 
 st.title("🌦️ Време и Морски Условия (за рибари)")
-cities = ["Plovdiv", "Burgas", "Varna", "Sofia"]
-city = st.selectbox("Избери град:", cities, index=0)
+city = st.text_input("Въведи град:", "Plovdiv")
 
 # --- Геолокация ---
 geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city}&limit=1&appid={API_KEY}"
@@ -89,7 +88,7 @@ if norm_rain_days:
     else:
         st.info("☀️ Броят на дъждовните дни е в рамките на нормата.")
 
-# --- Въздух ---
+# --- Качество на въздуха ---
 st.subheader("🌫️ Качество на въздуха")
 URL_AIR = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
 air_response = requests.get(URL_AIR)
@@ -109,20 +108,23 @@ else:
 
 # --- Морски условия ---
 st.header("🌊 Морски условия (за рибари)")
+
 today = date.today().isoformat()
-storm_url = f"https://api.stormglass.io/v2/weather/point?lat={lat}&lng={lon}&params=waveHeight,waterTemperature,windSpeed&start={today}&end={today}"
-headers = {'Authorization': STORMGLASS_API_KEY}
+storm_url = (
+    f"https://api.stormglass.io/v2/weather/point?"
+    f"lat={lat}&lng={lon}&params=waveHeight,waterTemperature,windSpeed&start={today}&end={today}"
+)
+headers = {"Authorization": STORMGLASS_API_KEY}
 marine_resp = requests.get(storm_url, headers=headers)
 
 if marine_resp.status_code == 200:
-    hourly_data = marine_resp.json().get("hours", [])
-    if hourly_data:
-        first_valid = next((h for h in hourly_data if all(
-            key in h and h[key].get("noaa") is not None for key in ["waveHeight", "waterTemperature", "windSpeed"])), None)
-        if first_valid:
-            wave_height = first_valid["waveHeight"]["noaa"]
-            water_temp = first_valid["waterTemperature"]["noaa"]
-            wind_speed = first_valid["windSpeed"]["noaa"]
+    hours = marine_resp.json().get("hours", [])
+    if hours:
+        latest = hours[0]  # вземаме първия наличен час
+        try:
+            wave_height = latest["waveHeight"]["noaa"]
+            water_temp = latest["waterTemperature"]["noaa"]
+            wind_speed = latest["windSpeed"]["noaa"]
 
             st.metric("🌊 Височина на вълните", f"{wave_height:.1f} m")
             st.metric("🌡️ Температура на водата", f"{water_temp:.1f} °C")
@@ -132,9 +134,15 @@ if marine_resp.status_code == 200:
                 st.warning("⚠️ Вълните са високи – не се препоръчва излизане за риболов.")
             else:
                 st.success("✅ Морските условия са добри за риболов.")
-        else:
-            st.warning("⚠️ Липсват валидни данни за морските условия.")
+
+            # Добавяме линкове към морски източници
+            st.markdown("🔗 [Stormglass API](https://stormglass.io/) - за повече данни за морето.")
+            st.markdown("🔗 [NOAA Wave Heights](https://www.noaa.gov/) - за прогнози на вълните.")
+            st.markdown("🔗 [Windy.com](https://www.windy.com/) - за допълнителни прогнози за вятър и вълни.")
+            
+        except KeyError:
+            st.warning("⚠️ Някои морски стойности липсват в отговора.")
     else:
-        st.warning("⚠️ Не са получени часове за днешния ден от StormGlass.")
+        st.warning("⚠️ Няма налични морски данни за днес.")
 else:
     st.warning("⚠️ Неуспешно изтегляне на морски данни. Провери API ключа.")
